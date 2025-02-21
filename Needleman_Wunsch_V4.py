@@ -2,8 +2,8 @@
 
 # function to assign scores
 def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, match_score, mismatch_score, gap_score):
-    for i in range(1, len(rows_string)+1):
-        for j in range(1, len(cols_string)+1):
+    for j in range(1, len(rows_string)+1):
+        for i in range(1, len(cols_string)+1):
             scores = []; # will be ordered match, gap on rows string, gap on cols string [probably opposite row/col]
             if rows_string[j-1] == cols_string[i-1]:
                 scores.append(scores_matrix[j-1][i-1] + match_score)
@@ -25,8 +25,8 @@ def traceback_print_align(arrows_matrix, cols_string, rows_string):
     align_rows = ''
     align_cols = ''
     # could we start from the beginning? probably yes
-    i = len(rows_string)
-    j = len(cols_string)
+    i = len(cols_string)
+    j = len(rows_string)
     while i > 0 and j > 0:
         if arrows_matrix[j][i] == 0:
             align_rows = align_rows + rows_string[j-1]
@@ -50,6 +50,8 @@ if __name__ == '__main__':
     # define string to be aligned
     string_n_columns = 'GCATGCG'
     string_m_rows = 'GATTACA'
+    #string_n_columns = 'AAAAAGTC'
+    #string_m_rows = 'AAAAA'
     #string_n_columns = 'CAT'
     #string_m_rows = 'CAT'
     n = len(string_n_columns)
