@@ -1,1 +1,10 @@
 *.docx
+.snakemake/*
+*.pdf
+*.gz
+*.aux
+*.log
+*.nav
+*.snm
+*.vrb
+*.toc

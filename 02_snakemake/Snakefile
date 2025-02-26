@@ -1,0 +1,37 @@
+import gzip 
+rule count_reads_naive:
+    input: fq="fastq/a.fastq.gz"
+    output: n="a_n_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+        
+rule count_reads:
+    input: fq="fastq/{sample}.fastq.gz"
+    output: n="{sample}_n_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+
+
+SAMPLES = ['a', 'b', 'c', 'd']
+rule all_n_reads:
+   input: expand("{sample}_n_reads.txt", sample=SAMPLES)
+
+rule all_counts:
+   input: expand("{sample}_n_reads.txt", sample=SAMPLES)
+   output: "all_n_reads.txt"
+   shell: "cat {input} > {output}"
+
+rule plot:
+    input: n="all_n_reads.txt"
+    output: plot="n_reads.png"
+    script: "histogram_reads.R"

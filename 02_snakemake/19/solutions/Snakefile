@@ -1,0 +1,109 @@
+## All rules should be executed in a shell with the environment that you used with Prof. Molineris loaded:
+# $ conda
+
+# https://docs.google.com/presentation/d/1bfdVoH5QiCijTPSb-H2zYP0METFRGbfHepQ5zJytpDY/edit#slide=id.g98431aadc5_0_1103
+# https://docs.google.com/presentation/d/1K9Y-EuirRfEBMErjx8WgKTe8LlI0decL-KsORn4DAwc/edit#slide=id.gf7c04f0c33_0_15
+
+SAMPLES = ['a','b','c','d','e']
+
+INDEX_DIR='/home/imolineris/biotech4neuron_lessons/dataset/ucsc/dm6_STAR_index'
+GTF='/home/imolineris/biotech4neuron_lessons/dataset/ucsc/ENCODE.gtf'
+BED='/home/imolineris/biotech4neuro_lessons/dataset/ucsc/dm6_ensembl.bed'
+
+MAP='/home/elenagrassi/biotech4neuro/material/19/map_droso.tsv'
+FQ_DIR='/home/elenagrassi/biotech4neuro/material/19'
+
+THREADS=1
+
+rule all_qc:
+    input: expand("sample_{sample}_fastqc.html", sample=SAMPLES)
+
+rule fastqc:
+    input: FQ_DIR+'/sample_{sample}.fastq.gz'
+    output: "sample_{sample}_fastqc.html"
+    shell: 
+        """
+            fastqc -o . {input}
+            rm sample_{wildcards.sample}_fastqc.zip
+        """
+
+rule align:
+    input: fastq=FQ_DIR+'/sample_{sample}.fastq.gz'
+    output: "sample_{sample}_Aligned.sortedByCoord.out.bam"
+    params: index=INDEX_DIR, threads=THREADS
+    shell: 
+        """
+            STAR  --readFilesCommand zcat --runThreadN {params.threads} --genomeDir {params.index} --readFilesIn {input.fastq} --outFileNamePrefix sample_{wildcards.sample}_ --outSAMtype BAM SortedByCoordinate --outBAMsortingThreadN {params.threads}
+        """
+
+rule featureCount:
+    input: bam="sample_{sample}_Aligned.sortedByCoord.out.bam", gtf=GTF
+    output: "sample_{sample}_counts.tsv"
+    params: index=INDEX_DIR, threads=THREADS
+    shell: 
+        """
+            featureCounts -o {output} -T {params.threads} -t exon -g gene_name -s 0 -a {input.gtf} {input.bam}
+        """
+
+rule all_counts:
+    input: expand("sample_{sample}_counts.tsv", sample=SAMPLES)
+    output: counts="all_counts.tsv"
+    script: "merge_counts.R"
+
+rule extract_expressed_genes:
+    input: counts="all_counts.tsv"
+    output: expr_counts="expressed_genes_counts.tsv"
+    script: "expressed_genes.R"
+
+rule translate_to_flybase:
+    input: counts="expressed_genes_counts.tsv", map=MAP
+    output: ense_counts="expressed_genes_counts_flybase.tsv"
+    script: "translate_flybase.R"
+
+rule bed_expressed_genes:
+    input: bed=BED, expr="expressed_genes_counts_flybase.tsv"
+    output: "expr.bed"
+    shell: 
+        """
+            sed 1d {input.expr} | cut -f 7 > {output}.tmp
+            grep -w -f {output}.tmp {input.bed} > {output}
+            rm {output}.tmp
+        """
+    
+rule bai:
+    input: "{whatever}.bam"
+    output: "{whatever}.bam.bai"
+    shell: "samtools index {input}"
+    
+# We need a to build the bam index for this!
+rule read_distribution:
+    input: bam="sample_{sample}_Aligned.sortedByCoord.out.bam", bed="expr.bed", bai="sample_{sample}_Aligned.sortedByCoord.out.bam.bai"
+    output: "sample_{sample}.geneBodyCoverage.curves.pdf"
+    shell: 
+        """
+            geneBody_coverage.py -i {input.bam} -r {input.bed} -o sample_{wildcards.sample}
+        """
+
+#### bash version of expressed genes
+# Extracting the list of expressed genes is doable in bash only, but in this case it would have been
+# easier to work on single samples and then put together the info afterwards. Obtaining all_counts.tsv with
+# bash only is doable too, but we did not have time to study all the required tools.
+rule expr_genes_sample:
+    input: "sample_{sample}_counts.tsv"
+    output: "sample_{sample}_expr.tsv"
+    shell:
+        """
+            sed 1d {input} | awk -F$'\\t' '$7 != 0 {{print $0}}' > {output}
+        """
+
+rule extract_expressed_genes_bash:
+    input: expand("sample_{sample}_expr.tsv", sample=SAMPLES)
+    output: "expressed_genes_bash.tsv"
+    shell:
+        """
+            cut -f 1 {input} | grep -v Geneid | sort | uniq > {output}
+        """
+
+########### Maintenance
+rule clean:
+	shell: "rm -f *Log *tab *out *summary sample*tsv log.txt *counts*tsv *bam *bai *geneBodyCoverage* expr.bed expressed_genes_bash.tsv"
