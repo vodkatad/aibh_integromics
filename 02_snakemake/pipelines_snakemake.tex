@@ -483,7 +483,7 @@ rule get_counts:
 
 Let's suppose you want to try different \textcolor{beer}{alignment parameters} and evaluate the resulting \% of aligned reads. \\
 You can have the same input for a rule and use a wildcard as output to determine one parameter of your tool:
-\begin{python}[basicstyle=\small]
+\begin{python}[basicstyle=\tiny]
 rule align:
    input: "{sample}.fastq.gz"
    output: "{sample}_align{multimap}.bam"
@@ -497,31 +497,35 @@ rule align:
 \frametitle{We can put code everywhere to fine-tune our pipeline}
 What if we have a paired end sequencing?
 
-Is it possible to have our plot done on \texttt{top\_n.txt} or \texttt{commands\_counts.txt}?
-\begin{columns}
-\column{.5\textwidth}
-\begin{figure}\includegraphics[width=0.5\textwidth]{./img/dag_his2.pdf}\end{figure}
-\column{.5\textwidth}
-\begin{figure}\includegraphics[width=0.5\textwidth]{./img/dag_his3.pdf}\end{figure}
-\end{columns}
+We should be able to count n. of reads in \textcolor{beer}{files with different names}:
+\texttt{\{sample\}.fastq.gz} or \texttt{\{sample\}.R1.fastq.gz} - since R2 will have the same
+number of reads we can access only R1, but let's suppose that given a sample we want to use the R1 file
+if it exists and the single-end file otherwise (this is a risky logic in the real world, probably \ldots as an 
+exercise try to modify our example code to print an error if a samples has both the R1 and the unpaired ends file!).
+
 \end{frame}
 
 
 \begin{frame}[fragile]
-\begin{python}[basicstyle=\small]
-def find_input_plot(wildcards):
-   if wildcards.n == "all":
-      return "commands_counts.txt"
-   else:
-      return "top_"+wildcards.n+".txt"
+\begin{lstlisting}[basicstyle=\tiny]
+def find_R1_or_other(wildcards):
+    import os
+    if os.path.isfile(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz')):
+        return(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz'))
+    else:
+        return(os.path.join('fastq', wildcards.sample+'.fastq.gz'))
 
-rule plots_generic:
-   input: counts=find_input_plot
-   output: plot="commands_frequencies_{n}.png"
-   script: "freq_commands.R"
-\end{python}
-\tiny{Since we did not study Python I won't ask you to know how to do this, but you'll need to know that this is a possibility and to 'read' simple code,
-like this one, to understand what'll do.}
+rule count_reads_R1_precedence:
+    input: fq=find_R1_or_other
+    output: n="{sample}_nn_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+\end{lstlisting}
 \end{frame}
 
 
@@ -530,7 +534,7 @@ like this one, to understand what'll do.}
 Snakemake is a workflow management system that makes bioinformaticians lifes easier, basically allowing them
 to define their \textcolor{galon}{pipelines} once and then running them for lots of different datasets and on different
 computational resources with minimal effort. \\
-It's behaviour is defined by \textcolor{novak}{rules}, whose order is defined by a chain of input-output, and whose behaviour
+It's behaviour is defined by \textcolor{novak}{rules}, whose order is defined by a chain of input-output, and whose actions
 can be defined with shell commands, various scripts (such as R) or python code. With little python knowledge pipelines can be tailored
 at (almost) every level.
 \\ The price we need to pay is to learn it and think about how we want to structure
@@ -544,49 +548,49 @@ you to start here: \url{https://snakemake.readthedocs.io/en/stable/tutorial/basi
 \end{frame}
 % -j as a first scalability asset
 
-%\subsection{benchmark}
-%\begin{frame}[fragile]
-%\frametitle{Benchmarking rules}
-%\begin{python}
-%import time
-%rule to_benchmark:
-%	benchmark: repeat("benchmarks/benchsleep.tsv", 10)
-%    run: 
-%		time.sleep(4.2)
-%\end{python}
-%\texttt{snakemake to\_benchmark} produce un file di 10 righe:
-%\tiny{
-%\begin{table}
-%\centering
-%\begin{tabular}{lllllllll}
-%s      & h:m:s   & max\_rss & max\_vms & max\_uss & max\_pss & io\_in & io\_out & mean\_load  \\
-%4.2141 & 0:00:04 & 25.92    & 249.45   & 16.96    & 18.04    & 0.21   & 0.00    & 3.08        \\
-%4.2218 & 0:00:04 & 26.18    & 249.45   & 17.00    & 18.08    & 0.21   & 0.00    & 2.83        \\
-%4.2245 & 0:00:04 & 26.18    & 249.45   & 17.02    & 18.10    & 0.21   & 0.00    & 2.83       
-%\end{tabular}
-%\end{table}
-%}
-%\end{frame}
+\subsection{benchmark}
+\begin{frame}[fragile]
+\frametitle{Benchmarking rules}
+\begin{python}
+import time
+rule to_benchmark:
+	benchmark: repeat("benchmarks/benchsleep.tsv", 10)
+    run: 
+		time.sleep(4.2)
+\end{python}
+\texttt{snakemake to\_benchmark} produce un file di 10 righe:
+\tiny{
+\begin{table}
+\centering
+\begin{tabular}{lllllllll}
+s      & h:m:s   & max\_rss & max\_vms & max\_uss & max\_pss & io\_in & io\_out & mean\_load  \\
+4.2141 & 0:00:04 & 25.92    & 249.45   & 16.96    & 18.04    & 0.21   & 0.00    & 3.08        \\
+4.2218 & 0:00:04 & 26.18    & 249.45   & 17.00    & 18.08    & 0.21   & 0.00    & 2.83        \\
+4.2245 & 0:00:04 & 26.18    & 249.45   & 17.02    & 18.10    & 0.21   & 0.00    & 2.83       
+\end{tabular}
+\end{table}
+}
+\end{frame}
 
-%\begin{frame}[fragile]
-%\frametitle{Benchmarking stats}
-%\footnotesize{
-%\begin{itemize}
-%\item \textbf{s}: secondi
-%\item \textbf{h:m:s}: \textcolor{novak}{ore:minuti:secondi}
-%\item \textbf{max\_rss}: \textcolor{galon}{max resident set size}, massima memoria RAM usata dal processo
-%\item \textbf{max\_vms}: max virtual memory size, la memoria virtuale include la RAM di sopra ma ha altre porzioni (che risiedono su disco e non nella RAM)
-%\item \textbf{max\_uss}: max unique set size: memoria assegnata unicamente a questo processo
-%\item \textbf{max\_pss}: max proportional set size, stima che considera la condivisione con altri processi di memoria
-%\item \textbf{io\_in}: Mb letti (?)
-%\item \textbf{io\_out}: Mb scritti
-%\item \textbf{mean\_load}: carico medio del sistema ($\sim$ numero di processi in esecuzione)
-%\end{itemize}
-%}
-%Un file di benchmark puo` essere a sua volta input di una regola che calcola medie e altre informazioni
-%riassuntive. \\
-%Su sistemi operativi diversi da linux potreste avere meno voci!
-%\end{frame}
+\begin{frame}[fragile]
+\frametitle{Benchmarking stats}
+\footnotesize{
+\begin{itemize}
+\item \textbf{s}: secondi
+\item \textbf{h:m:s}: \textcolor{novak}{ore:minuti:secondi}
+\item \textbf{max\_rss}: \textcolor{galon}{max resident set size}, massima memoria RAM usata dal processo
+\item \textbf{max\_vms}: max virtual memory size, la memoria virtuale include la RAM di sopra ma ha altre porzioni (che risiedono su disco e non nella RAM)
+\item \textbf{max\_uss}: max unique set size: memoria assegnata unicamente a questo processo
+\item \textbf{max\_pss}: max proportional set size, stima che considera la condivisione con altri processi di memoria
+\item \textbf{io\_in}: Mb letti (?)
+\item \textbf{io\_out}: Mb scritti
+\item \textbf{mean\_load}: carico medio del sistema ($\sim$ numero di processi in esecuzione)
+\end{itemize}
+}
+Un file di benchmark puo` essere a sua volta input di una regola che calcola medie e altre informazioni
+riassuntive. \\
+Su sistemi operativi diversi da linux potreste avere meno voci!
+\end{frame}
 
 %https://docs.google.com/presentation/d/1K9Y-EuirRfEBMErjx8WgKTe8LlI0decL-KsORn4DAwc/edit#slide=id.gf7c04f0c33_0_15
 

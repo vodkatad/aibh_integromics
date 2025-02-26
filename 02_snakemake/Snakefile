@@ -35,3 +35,22 @@ rule plot:
     input: n="all_n_reads.txt"
     output: plot="n_reads.png"
     script: "histogram_reads.R"
+
+def find_R1_or_other(wildcards):
+    import os
+    if os.path.isfile(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz')):
+        return(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz'))
+    else:
+        return(os.path.join('fastq', wildcards.sample+'.fastq.gz'))
+
+rule count_reads_R1_precedence:
+    input: fq=find_R1_or_other
+    output: n="{sample}_nn_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+
