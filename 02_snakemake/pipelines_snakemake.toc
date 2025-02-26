@@ -1,7 +1,0 @@
-\beamer@sectionintoc {1}{Pipeline management systems}{2}{0}{1}
-\beamer@sectionintoc {2}{Snakemake}{6}{0}{2}
-\beamer@subsectionintoc {2}{1}{intro}{6}{0}{2}
-\beamer@subsectionintoc {2}{2}{Basics}{8}{0}{2}
-\beamer@subsectionintoc {2}{3}{Wildcards}{15}{0}{2}
-\beamer@subsectionintoc {2}{4}{Details}{19}{0}{2}
-\beamer@subsectionintoc {2}{5}{More details}{21}{0}{2}
