@@ -47,6 +47,8 @@ osds <- order(sds)
 methy <- methy[, osds]
 methy <- methy[, seq(1, 200)]
 
+sel_p_methy <- colnames(methy)
+
 protcoding <- read.table('/mnt/trcanmed/snaketree/stash/tss_default.bed', sep="\t", header=F, stringsAsFactors = F)
 expr <- expr[, colnames(expr) %in% paste0('H_', protcoding$V4)]
 exprave <- colMeans(expr)
@@ -56,7 +58,11 @@ osds <- order(-sds)
 expr <- expr[, osds]
 expr <- expr[, seq(1, 200)]
 
-
+sel_g_expr <- colnames(expr)
+######################
+expr <- expr[, wg]
+methy <- methy[, wp]
+######################
 test_n <- 65
 set.seed(42)
 test <- sample(models, size=65)
@@ -100,7 +106,7 @@ pls1 <- spls(data[["methy"]], data[["mRNA"]],
              keepX = list.keepX, keepY = list.keepY) 
 
 # plot features of first PLS
-# cutoff = 0 selection dei geni fatta a cazzo?
+# cutoff = 0 selection dei geni fatta a cazzo? (sì era sd ordinata al contrario)
 p <- plotVar(pls1, cutoff = 0.5, title = "(a) miRNA vs mRNA", 
              legend = c("methy", "mRNA"), 
              var.names = FALSE, style = 'graphics', 
@@ -168,3 +174,61 @@ confusion.mat = get.confusion_matrix(truth = as.factor(methy_cl_te$cluster),
 get.BER(confusion.mat)
 
 cimDiablo(final.diablo.model)
+
+
+### TCGA
+tcga_methy_f <- '/mnt/trcanmed/snaketree/prj/pdx_methylation/dataset/v4/TCGA/TCGA_m_selected_onBeta_2023_v2.tsv.gz'
+tcga_expr_f <- '/mnt/trcanmed/snaketree/stash/TCGA-COAD.star_tpm_gs.tsv.gz'
+
+expr_t <- read.table(gzfile(tcga_expr_f), sep="\t", header=T, row.names=1)
+methy_t <- read.table(gzfile(tcga_methy_f), sep="\t", header=T, row.names=1)
+
+expr_t <- expr_t[!grepl(',',expr_t$description),]
+
+df <- as.data.frame(table(expr_t$description))
+expr_t <- expr_t[expr_t$description %in% df[df$Freq==1, 'Var1'],]
+rownames(expr_t) <- expr_t$description
+expr_t$description <- NULL
+
+expr_t <- t(expr_t)
+methy_t <- t(methy_t)
+
+w <- intersect(rownames(expr_t), rownames(methy_t))
+expr_t <- expr_t[w,]
+methy_t <- methy_t[w,]
+
+colnames(expr_t) <- paste0('H_', colnames(expr_t))
+
+expr_t <- expr_t[,colnames(expr_t) %in% sel_g_expr]
+methy_t <- methy_t[,colnames(methy_t) %in% sel_p_methy]
+
+methy_t <- as.data.frame(scale(methy_t))
+expr_t <- as.data.frame(scale(expr_t))
+
+data.test.TCGA = list(methy = methy_t, mRNA = expr_t)
+
+predict.diablo = predict(final.diablo.model, newdata = data.test.TCGA)
+
+#confusion.mat = get.confusion_matrix(truth = as.factor(methy_cl_te$cluster),
+#                                     predicted = predict.diablo$WeightedVote$centroids.dist[,ncomp]) 
+
+table(predict.diablo$WeightedVote$centroids.dist[,ncomp])
+
+pls1 <- spls(data.test.TCGA[["methy"]], data.test.TCGA[["mRNA"]], 
+             keepX = list.keepX, keepY = list.keepY) 
+
+# plot features of first PLS
+list.keepX <- c(25, 25) # select arbitrary values of features to keep
+list.keepY <- c(25, 25)
+
+p <- plotVar(pls1, cutoff = 0.5, title = "(a) miRNA vs mRNA", 
+             legend = c("methy", "mRNA"), 
+             var.names = FALSE, style = 'graphics', 
+             pch = c(16, 17), cex = c(2,2), 
+             col = c('darkorchid', 'lightgreen'))
+
+wg <- colnames(expr_t)
+wp <- colnames(methy_t)
+saveRDS(wp, file="~/selected_common_diablo.rds")
+
+write.table(predict.diablo$WeightedVote$centroids.dist, sep="\t", file="~/TCGA_diablo.tsv", quote=F)
