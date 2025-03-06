@@ -1,0 +1,293 @@
+---
+title: "Methylation clusters in mCRC and Diablo"
+author: "Elena Grassi"
+date: "2025-03-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(mixOmics)
+set.seed(42)
+pbar <- FALSE
+# set to true for inline interactive runs
+```
+
+## Methylation clusters
+
+In our lab we have characterized our PDX collection at the methylomic level with an EPIC array.
+Unsupervised clustering of the methylation profiles uncovered 5 clusters that have interesting biological characteristics,
+but we were never able to build a classifier that is able to reliably identify these clusters in external datasets, such as TCGA.
+
+Our aim today is to determine if using methylation data alongside mRNA expression we can do a better job. We'll use DIABLO
+to train a model on PDX data, using known clusters labels, and then see what happens on TCGA...we do not know
+the reality there, but we can at least see if the fraction of samples found in different clusters make sense!
+
+You'll need several files for this lab:
+
+- methylation data in PDX
+- expression data in PDX
+- methylation data in TCGA
+- expression data in TCGA
+- list of protein coding genes
+- cluster labels for PDX
+
+You can download them all from here: TODO, they are available on our server here: TODO
+
+We will first load all the datasets and do some cleaning, specifically we need to:
+- keep only the PDX from liver mets, to get a homogeneous cohort (we also have some PDX from primary tumors)
+- subset PDX expression and methylation data to keep only the samples for which both information are available
+- do the same procedure for TCGA
+- then we need to take care of features: we need the same set of methylation features (probes) in PDX and TCGA
+- ... and also for expression (RNAseq annotation pipelines were not run with the same set of genes and the filtering
+of methylation probes with valid measures is always dataset specific).
+
+Let's give a look at the files before loading them and perform this initial filtering.
+*NOTE* to slightly ease our lab-life these files already are prefiltered in some ways:
+- only highly variable methylation probes in PDX
+- no replicates: only one model/tumor expression level/methylation levels are present 
+(replicates were averaged when available)
+
+```{r preliminary, echo=TRUE}
+tcga_methy_f <- '/mnt/trcanmed/snaketree/prj/pdx_methylation/dataset/v4/TCGA/TCGA_m_selected_onBeta_2023_v2.tsv.gz'
+tcga_expr_f <- '/mnt/trcanmed/snaketree/stash/TCGA-COAD.star_tpm_gs.tsv.gz'
+expr_f <- '/mnt/trcanmed/snaketree/prj/pdx_methylation/dataset/v2/misc/LMX_BASALE_mean_gene_genealogy-MethylSamples.tsv.gz'
+methy_f <- '/mnt/trcanmed/snaketree/prj/pdx_methylation/dataset/v4/cluval/0.01_m_selected_onBeta_2023.tsv.gz'
+prot_coding_f <- '/mnt/trcanmed/snaketree/stash/tss_default.bed'
+methy_cl_f <- '/mnt/trcanmed/snaketree/prj/pdx_methylation/dataset/v4/cluval/NMF/PDXs-2023/samples_clusters_k5_ordered_2023.tsv'
+
+expr <- read.table(gzfile(expr_f), sep="\t", header=T, row.names=1)
+methy <- read.table(gzfile(methy_f), sep="\t", header=T, row.names=1)
+
+# Filter only PDX from liver mets
+methy <- methy[, grepl('LMX', colnames(methy))]
+
+# We (diablo) want to work with samples on rows and features on columns
+expr <- t(expr)
+methy <- t(methy)
+rownames(methy) <- substr(rownames(methy), 0, 7)
+
+
+# list of common models with expression and methylation data in PDX:
+models <- intersect(rownames(methy), rownames(expr))
+
+
+expr_t <- read.table(gzfile(tcga_expr_f), sep="\t", header=T, row.names=1)
+methy_t <- read.table(gzfile(tcga_methy_f), sep="\t", header=T, row.names=1)
+
+# TCGA had ENSG as gene identifiers, I used a library (ask if you are curious)
+# to traduce them to gene symbol but then I have some ENSG that corresponds to 
+# two different genes...in the real world I would need to determine if this
+# is common enough to require me to made a choice, here we have limited computational
+# power so we get a shortcut: remove all the genes with multiple translations 
+# and on the other side get only genes symbols that appear once 
+# (they need to be rownames for diablo)
+expr_t <- expr_t[!grepl(',',expr_t$description),]
+
+df <- as.data.frame(table(expr_t$description))
+expr_t <- expr_t[expr_t$description %in% df[df$Freq==1, 'Var1'],]
+rownames(expr_t) <- expr_t$description
+expr_t$description <- NULL
+
+expr_t <- t(expr_t)
+methy_t <- t(methy_t)
+
+# selection of common samples in TCGA
+w <- intersect(rownames(expr_t), rownames(methy_t))
+expr_t <- expr_t[w,]
+methy_t <- methy_t[w,]
+
+# gene symbols in PDX expression have a H_ prefix:
+colnames(expr_t) <- paste0('H_', colnames(expr_t))
+
+common_gene_symbol <- intersect(colnames(expr), colnames(expr_t))
+common_probes <- intersect(colnames(methy), colnames(methy_t))
+
+expr <- expr[, common_gene_symbol]
+methy <- methy[, common_probes]
+
+expr_t <- expr_t[, common_gene_symbol]
+methy_t <- methy_t[, common_probes]
+
+# cluster labels
+# prediction - Y
+methy_cl <- read.table(methy_cl_f, sep="\t", header=F)
+colnames(methy_cl) <- c('sample', 'cluster')
+methy_cl <- methy_cl[grepl('LMX', methy_cl$sample),]
+rownames(methy_cl) <- methy_cl$sample
+methy_cl$sample <- NULL
+
+```
+
+Ideally DIABLO performs variable selection via L1 penalization too, but to have it run decently fast for the lab
+we will need to pre-select only 200 probes/genes to train it on PDX...and since I am mentioning training:
+we want to keep an internal validation set (small) of PDX to test our predictions before proceeding to TCGA.
+We'll scale our datasets (Z score) as DIABLO requires separately. *TODO ASK SOFIA*
+
+```{r preliminary_2, echo=TRUE}
+
+# naive feature selection based on variance for methy and on average 
+# expression of protein coding genes+sd for expression
+sds <- apply(methy, 2, sd)
+osds <- order(-sds)
+methy <- methy[, osds]
+methy <- methy[, seq(1, 200)]
+
+sel_p_methy <- colnames(methy)
+
+protcoding <- read.table('/mnt/trcanmed/snaketree/stash/tss_default.bed', sep="\t", header=F, stringsAsFactors = F)
+expr <- expr[, colnames(expr) %in% paste0('H_', protcoding$V4)]
+exprave <- colMeans(expr)
+expr <- expr[, exprave > median(exprave)]
+sds <- apply(expr, 2, sd) # not the best selection add expression min TODO
+osds <- order(-sds)
+expr <- expr[, osds]
+expr <- expr[, seq(1, 200)]
+
+expr_t <- expr_t[, colnames(expr)]
+methy_t <- methy_t[, colnames(methy)]
+
+
+test_n <- 65
+test <- sample(models, size=65)
+train <- setdiff(models, test)
+
+methy_tr <- methy[train,]
+expr_tr <- expr[train,]
+
+methy_te <- methy[test,]
+expr_te <- expr[test,]
+
+# scale
+methy_tr <- as.data.frame(scale(methy_tr))
+expr_tr <- as.data.frame(scale(expr_tr))
+methy_te <- as.data.frame(scale(methy_te))
+expr_te <- as.data.frame(scale(expr_te))
+
+methy_cl_te <- methy_cl[test, , drop=F]
+methy_cl_tr <- methy_cl[train, , drop=F]
+```
+
+## DIABLO
+
+Let's follow the DIABLO vignette: https://mixomics.org/mixdiablo/diablo-tcga-case-study/
+First we'll see if gene expression and methylation are correlated when projected to its first component
+with an arbitrary number of selected features.
+
+```{r diablo_pre, echo=TRUE}
+# prelim analysis
+data <- list(methy = methy_tr,
+            mRNA = expr_tr)
+Y <- as.factor(methy_cl_tr$cluster) # set the response variable as the Y df
+
+list.keepX <- c(25, 25) # select arbitrary values of features to keep
+list.keepY <- c(25, 25)
+
+# generate three pairwise PLS models
+pls1 <- spls(data[["methy"]], data[["mRNA"]], 
+             keepX = list.keepX, keepY = list.keepY) 
+
+# plot features of first PLS
+p <- plotVar(pls1, cutoff = 0.5, title = "(a) miRNA vs mRNA", 
+             legend = c("methy", "mRNA"), 
+             var.names = FALSE, style = 'graphics', 
+             pch = c(16, 17), cex = c(2,2), 
+             col = c('darkorchid', 'lightgreen')) # not so informative with 200-25 :/
+
+```
+
+What do we see in this plot?
+
+Ok now we can setup the design matrix: since we want to work more on prediction 
+and less on feature selection we'll be biased towards a DIABLO_NULL matrix
+
+```{r diablo_pre2, echo = TRUE}
+design <- matrix(0.1, ncol = length(data), nrow = length(data), 
+                dimnames = list(names(data), names(data)))
+diag(design) <- 0 # set diagonal to 0s
+# null would be all 0, full all 1 with 0 on diag
+
+#An arbitrarily high number of components
+basic.diablo.model <- block.splsda(X = data, Y = Y, ncomp = 8, design = design) 
+
+plot(basic.diablo.model)
+# run component number tuning with repeated CV # lunghetto su questi dati - reduce n repeat?
+perf.diablo = perf(basic.diablo.model, validation = 'Mfold', 
+                   folds = 10, nrepeat = 5, progressBar=pbar) 
+
+plot(perf.diablo) # plot output of tuning
+## think _well_ about what's happening here
+
+ncomp = perf.diablo$choice.ncomp$WeightedVote["Overall.BER", "centroids.dist"] 
+# show the optimal choice for ncomp for each dist metric
+perf.diablo$choice.ncomp$WeightedVote 
+
+
+```
+
+Now we are looking at prediction performances, with a 10 fold crossvalidation on our test
+set, to decide the number of components that we'll use in our model.
+The next step is to choose the number of features that will go into the components with a tuning
+and not our originally random 25... The explored space is limited for time's sake, again.
+
+```{r diablo_tune_nfeat, echo = TRUE}
+
+# set grid of values for each component to test # TODO reduce here if too slow
+test.keepX = list (methy = c(5:9, seq(10,30,5)), 
+                   mRNA = c(5:9, seq(10,30,5)))
+
+tune = tune.block.splsda(X = data, Y = Y, ncomp = ncomp, 
+                              test.keepX = test.keepX, design = design,
+                              validation = 'Mfold', folds = 10, nrepeat = 1,
+                              dist = "centroids.dist", progressBar=pbar) # 16:20 - 16:28
+
+list.keepX = tune$choice.keepX # set the optimal values of features to retain on each component
+list.keepX
+
+final.diablo.model = block.splsda(X = data, Y = Y, ncomp = ncomp, 
+                                  keepX = list.keepX, design = design)
+
+```
+TODO
+
+```{r diablo_predict, echo=TRUE}
+# discuss: all 1 vs Y for prediction.
+final.diablo.model$design # design matrix for the final model
+
+# Some of the top selected genes:
+selectVar(final.diablo.model, block = 'mRNA', comp = 1)$mRNA$name 
+
+plotDiablo(final.diablo.model, ncomp = 1) 
+plotDiablo(final.diablo.model, ncomp = 2) 
+
+plotIndiv(final.diablo.model, ind.names = FALSE, legend = TRUE, 
+          title = 'DIABLO Sample Plots')
+
+data.test = list(methy = methy_te, mRNA = expr_te)
+
+predict.diablo = predict(final.diablo.model, newdata = data.test)
+
+confusion.mat = get.confusion_matrix(truth = as.factor(methy_cl_te$cluster),
+                                     predicted = predict.diablo$WeightedVote$centroids.dist[,ncomp]) 
+
+confusion.mat
+
+get.BER(confusion.mat)
+
+#cimDiablo(final.diablo.model)
+```
+
+Let's see what happens with TCGA:
+
+```{r diablo_external_valid, echo=TRUE}
+methy_t <- as.data.frame(scale(methy_t))
+expr_t <- as.data.frame(scale(expr_t))
+
+data.test.TCGA <- list(methy = methy_t, mRNA = expr_t)
+
+predict.diablo.TCGA <- predict(final.diablo.model, newdata = data.test.TCGA)
+
+table(predict.diablo.TCGA$WeightedVote$centroids.dist[,ncomp])
+
+# TODO compare freqs
+```
