@@ -4,7 +4,7 @@
 def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, match_score, mismatch_score, gap_score):
     for i in range(1, len(rows_string)+1):
         for j in range(1, len(cols_string)+1):
-            scores = [] # will be ordered match, gap on col string, gap on row string
+            scores = [] # will be ordered match, gap on row string, gap on col string
             if rows_string[i-1] == cols_string[j-1]:
                 scores.append(scores_matrix[i-1][j-1] + match_score)
             else:
