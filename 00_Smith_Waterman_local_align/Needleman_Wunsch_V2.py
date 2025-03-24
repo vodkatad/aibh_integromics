@@ -21,7 +21,7 @@ def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, match_
                 arrows_matrix[i][j] = 1
             
 # function to traceback and print global alignment
-def traceback_print_align(scores_matrix, arrows_matrix, cols_string, rows_string):
+def traceback_print_align(arrows_matrix, cols_string, rows_string):
     pass
 
 if __name__ == '__main__':
@@ -57,4 +57,4 @@ if __name__ == '__main__':
     print(arrows_matrix)
     print('The best global alignment score between ' + string_n_columns + ' and ' + string_m_rows + ' is ' + str(scores_matrix[m][n]))
 
-    traceback_print_align(scores_matrix, arrows_matrix, string_n_columns, string_m_rows)
+    traceback_print_align(arrows_matrix, string_n_columns, string_m_rows)

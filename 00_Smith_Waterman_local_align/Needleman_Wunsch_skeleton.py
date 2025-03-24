@@ -9,7 +9,7 @@ if __name__ == '__main__':
     string_n_columns = 'CAT'
     string_m_rows = 'CAT'
     n = len(string_n_columns)
-    m = len(string_m_row)
+    m = len(string_m_rows)
 
     # define useful constants
     match_score = 1
@@ -17,3 +17,6 @@ if __name__ == '__main__':
     gap_score = -1
 
     # build initial matrixes for scores and arrows
+    # call the function to assign scores
+    # print the global alignment score
+    # call the function for the traceback
