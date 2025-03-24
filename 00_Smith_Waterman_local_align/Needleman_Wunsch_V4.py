@@ -74,8 +74,8 @@ if __name__ == '__main__':
     arrows_matrix = [[float('nan')for i in range(n+1)] for j in range(m+1)]
     starting_score = 0
     score = starting_score
-    # the second [] indexes the rows
-    # the first [] the columns
+    # the second [] indexes the columns
+    # the first [] the rows
     for i in range(0, n+1):
         scores_matrix[0][i] = score
         score = score + gap_score
