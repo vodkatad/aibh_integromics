@@ -11,7 +11,7 @@ def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, match_
                 scores.append(scores_matrix[i-1][j-1] + mismatch_score)
             scores.append(scores_matrix[i][j-1] + gap_score)
             scores.append(scores_matrix[i-1][j] + gap_score)
-            maxi = scores.index(max(scores)) # With ties we report the first occurrence: we prefer alignment to gaps, then gap on the cols string
+            maxi = scores.index(max(scores)) # With ties we report the first occurrence: we prefer alignment to gaps, then gap on the rows string
             scores_matrix[i][j] = max(scores)
             if maxi == 0:
                 arrows_matrix[i][j] = 0 # TODO Use a named struct (?) for clarity
@@ -30,24 +30,24 @@ def traceback_print_align(arrows_matrix, cols_string, rows_string):
     j = len(cols_string)
     while i > 0 and j > 0:
         if arrows_matrix[i][j] == 0:
-            align_rows = align_rows + cols_string[j-1]
-            align_cols = align_cols + rows_string[i-1]
+            align_rows = align_rows + rows_string[i-1]
+            align_cols = align_cols + cols_string[j-1]
             i = i - 1
             j = j - 1
         elif arrows_matrix[i][j] == -1:
-            align_rows = align_rows + cols_string[j-1]
-            align_cols = align_cols + '-'
+            align_cols = align_cols + cols_string[j-1]
+            align_rows = align_rows + '-'
             j = j - 1
         else: # elif arrows_matrix[i][j] == 1:
-            align_rows = align_rows + '-'
-            align_cols = align_cols + rows_string[i-1]
+            align_cols = align_cols + '-'
+            align_rows = align_rows + rows_string[i-1]
             i = i - 1
     while i > 0:
-        align_rows = align_rows + rows_string[i]
+        align_rows = align_rows + rows_string[i-1]
         align_cols = align_cols + '-'
         i = i - 1        
     while j > 0:
-        align_cols = align_cols + cols_string[j]
+        align_cols = align_cols + cols_string[j-1]
         align_rows = align_rows + '-'
         j = j - 1        
     print(''.join(reversed(align_rows)))
@@ -57,8 +57,8 @@ if __name__ == '__main__':
     # define string to be aligned
     string_n_columns = 'GCATGCG'
     string_m_rows = 'GATTACA'
-    #string_m_rows = 'GTCAAAAA'
-    #string_n_columns = 'AAAAAGTCCCCCCCCCCAAAAAAAAAAAAAAAAAAAAAAAAAAAA'
+    string_n_columns = 'GTCAAAAACCCCCCCCCCCCCCCCCC'
+    string_m_rows = 'AAAAAGTCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
     #string_n_columns = 'CAT'
     #string_m_rows = 'CAT'
     n = len(string_n_columns)
