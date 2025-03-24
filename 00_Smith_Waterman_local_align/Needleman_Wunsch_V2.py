@@ -2,23 +2,23 @@
 
 # function to assign scores
 def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, match_score, mismatch_score, gap_score):
-    for j in range(1, len(rows_string)+1):
-        for i in range(1, len(cols_string)+1):
-            scores = []; # will be ordered match, gap on row string, gap on col string [probably opposite row/col]
-            if rows_string[j-1] == cols_string[i-1]:
-                scores.append(scores_matrix[j-1][i-1] + match_score);
+    for i in range(1, len(rows_string)+1):
+        for j in range(1, len(cols_string)+1):
+            scores = [] # will be ordered match, gap on col string, gap on row string
+            if rows_string[i-1] == cols_string[j-1]:
+                scores.append(scores_matrix[i-1][j-1] + match_score)
             else:
-                scores.append(scores_matrix[j-1][i-1] + mismatch_score);
-            scores.append(scores_matrix[j][i-1] + gap_score)
-            scores.append(scores_matrix[j-1][i] + gap_score)
-            maxi = scores.index(max(scores)) # TODO find what happens for ties
-            scores_matrix[j][i] = max(scores)
+                scores.append(scores_matrix[i-1][j-1] + mismatch_score)
+            scores.append(scores_matrix[i][j-1] + gap_score)
+            scores.append(scores_matrix[i-1][j] + gap_score)
+            maxi = scores.index(max(scores)) # In case of ties the first one is returned
+            scores_matrix[i][j] = max(scores)
             if maxi == 0:
-                arrows_matrix[j][i] = 0 # TODO Use a named struct (?) for clarity
+                arrows_matrix[i][j] = 0 # TODO Use a named struct (?) for clarity
             elif maxi == 1:
-                arrows_matrix[j][i] = -1
+                arrows_matrix[i][j] = -1
             else:
-                arrows_matrix[j][i] = 1
+                arrows_matrix[i][j] = 1
             
 # function to traceback and print global alignment
 def traceback_print_align(scores_matrix, arrows_matrix, cols_string, rows_string):
