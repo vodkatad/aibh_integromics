@@ -1,14 +1,21 @@
 #!/usr/bin/env python3
+from treelib import Node, Tree
+
 class Trie:
     def __init__(self):
-        self.root = TrieNode('', 0)
-        self.last_id = 0
+        self.root = TrieNode('', 1)
+        self.last_id = 1
 
     def print_adjacency(self):
-        pass
+        self.root.print_adjacency()
 
     def print_brutal(self):
         self.root.print_brutal()
+
+    def print_ascii(self):
+        tree = Tree()
+        self.root.print_ascii(tree, None)
+        tree.show()
 
     # returns the matching patterns if there is a match, None otherwise
     def match(self, genome):
@@ -49,6 +56,19 @@ class TrieNode:
         for c in self.children:
             c.print_brutal()
 
+    def print_ascii(self, tree, parent):
+        if parent is None:
+            tree.create_node(self.base, self.n_id)
+        else:
+            tree.create_node(self.base, self.n_id, parent=parent.n_id)
+        for c in self.children:
+            c.print_ascii(tree, self)
+
+    def print_adjacency(self):
+        for c in self.children:
+            print("{} {} {}".format(self.n_id, c.n_id, c.base))
+            c.print_adjacency()
+        
 if __name__ == '__main__':
     # 01 read the patterns from a file, each pattern on a row, precondition of no prefixes does not need to be checked [could be a bonus exercise]
     # 02 build the trie
@@ -59,5 +79,7 @@ if __name__ == '__main__':
                 trie.add_pattern(line)
     
     trie.print_brutal()
-
+    # 02 print the tree with treelib
+    trie.print_ascii()
     # 03 print the adjacency list in the format required by Rosalind
+    trie.print_adjacency()
