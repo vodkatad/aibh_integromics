@@ -55,12 +55,12 @@ def traceback_print_align(arrows_matrix, cols_string, rows_string):
 
 if __name__ == '__main__':
     # define string to be aligned
-    string_n_columns = 'GCATGCG'
-    string_m_rows = 'GATTACA'
+    string_n_columns = 'CATGG'
+    string_m_rows = 'CATCC'
     #string_n_columns = 'GTCAAAAACCCCCCCCCCCCCCCCCC'
     #string_m_rows = 'AAAAAGTCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
     #string_n_columns = 'CAT'
-    #string_m_rows = 'CAT'
+    #string_m_rows = 'CT'
     n = len(string_n_columns)
     m = len(string_m_rows)
 
@@ -84,12 +84,12 @@ if __name__ == '__main__':
         scores_matrix[j][0] = score
         score = score + gap_score
     # we see some almost repeated code here, so we could refactor in a function
-    print(scores_matrix)
+    #print(scores_matrix)
     # we'll keep nan in the arrows matrix and stop when we reach it
     
     assign_scores(scores_matrix, arrows_matrix, string_n_columns, string_m_rows, match_score, mismatch_score, gap_score)
-    print(scores_matrix)
-    print(arrows_matrix)
+    #print(scores_matrix)
+    #print(arrows_matrix)
     print('The best global alignment score between ' + string_n_columns + ' and ' + string_m_rows + ' is ' + str(scores_matrix[m][n]))
 
     traceback_print_align(arrows_matrix, string_n_columns, string_m_rows)
