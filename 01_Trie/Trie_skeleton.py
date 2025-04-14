@@ -11,13 +11,17 @@ class Trie:
     def print_brutal(self):
         self.root.print_brutal()
 
-    # returns the matching patterns if there is a match, None otherwise
-    def match(self, genome, pos):
+    def print_ascii(self):
         pass
 
     def add_pattern(self, pattern):
         pass
 
+    def next_id(self):
+        pass
+
+    def match(self, genome, pos):
+        pass
 
 class TrieNode:
     def __init__(self, base, n_id):
