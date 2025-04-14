@@ -24,15 +24,13 @@ class Trie:
         self.last_id = self.last_id + 1
         return(self.last_id)
 
-    # Returns ... TODO
-    def match(self, genome):
-        self.root.match(genome, '')
+    def match(self, genome, pos):
+        self.root.match(genome, '', pos)
 
 class TrieNode:
     def __init__(self, base, n_id):
         self.base = base
         self.n_id = n_id
-        self.last_id = n_id
         self.children = []
 
     def has_children(self, base):
@@ -69,13 +67,14 @@ class TrieNode:
             print("{} {} {}".format(self.n_id, c.n_id, c.base))
             c.print_adjacency()
 
-    def match(self, genome, matching_pattern):
+    def match(self, genome, matching_pattern, pos):
         if len(self.children) == 0 and matching_pattern != '':
             print('Match with {}'.format(matching_pattern))
+            print('', pos) # end = ''
         if len(genome) != 0:
             for c in self.children:
                 if c.base == genome[0]:
-                    c.match(genome[1:], matching_pattern + c.base)
+                    c.match(genome[1:], matching_pattern + c.base, pos)
 
 
 
@@ -102,4 +101,5 @@ if __name__ == '__main__':
                 genome = genome + line
     
     for i in range(0, len(genome)):
-        trie.match(genome[i:])
+        trie.match(genome[i:], i)
+    print('')
