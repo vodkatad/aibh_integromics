@@ -69,10 +69,10 @@ tabsize=4           %
 \begin{frame}
 	\begin{center} \inserttitle
 
-	\vspace{1cm}
+	\vspace{1.5cm}
 	\insertauthor  \\
     \small{\textit{\insertsubtitle \\}}
-	\insertdate \\ \vspace{1cm}
+	 \vspace{1.5cm}
 	%\includegraphics[height=2cm]{./img/logo_cbu.jpg}
     %\vspace{0.5cm}
 	%\begin{columns}[c]
@@ -158,7 +158,7 @@ the same pipeline with a single command and we can share it with other researche
 The majority of them offers a way to execute jobs on \textcolor{galon}{HPC systems} with ease - this means that if you need
 to align 1000 samples the system will take care of launching the alignment on each of them in parallel, using different cluster nodes.
 
-Another advantage lies is their ability to interact with different \textcolor{beer}{execution environments}
+Another advantage lies in their ability to interact with different \textcolor{beer}{execution environments}
 to easily allow using different versions of the chosen software in isolated environments.
 \\ \vspace{0.5cm}
 We have different options nowadays: \textcolor{beer}{Galaxy, CWL,  Nextflow, Snakemake, \ldots}
@@ -299,8 +299,7 @@ rule count_ciao:
 
 \begin{frame}
 \frametitle{Let's count the number of reads in fastq files!}
-Snakefile in: \\
-\texttt{TODO GIT}
+Example Snakefile on moodle. \\
 
 \texttt{snakemake -p} prints the commands it executes, \texttt{-n} is a dry-run (does not run anything but shows what it would do).
 \\
@@ -359,8 +358,8 @@ SAMPLES = ['a', 'b', 'c', 'd']
 rule all_n_reads:
    input: expand("{sample}_n_reads.txt", sample=SAMPLES)
 \end{python}
-We can set up a rule without any output that will have as input all the results of the 'last' step of our pipeline - i.e. all the results of \texttt{TODO}. \\
-We'll then be able to invoke it via its name: \texttt{\$ snakemake all\_counts}. The rule itself won't do anything but when we will launch it,
+We can set up a rule without any output that will have as input all the results of the 'last' step of our pipeline - i.e. all the results of \texttt{count\_reads}. \\
+We'll then be able to invoke it via its name: \texttt{\$ snakemake all\_n\_reads}. The rule itself won't do anything but when we will launch it,
 it will trigger the execution of all ``previous'' rules in the pipeline.
 \end{frame}
 
@@ -534,7 +533,7 @@ rule count_reads_R1_precedence:
 Snakemake is a workflow management system that makes bioinformaticians lifes easier, basically allowing them
 to define their \textcolor{galon}{pipelines} once and then running them for lots of different datasets and on different
 computational resources with minimal effort. \\
-It's behaviour is defined by \textcolor{novak}{rules}, whose order is defined by a chain of input-output, and whose actions
+Its behaviour is defined by \textcolor{novak}{rules}, whose order is defined by a chain of input-output, and whose actions
 can be defined with shell commands, various scripts (such as R) or python code. With little python knowledge pipelines can be tailored
 at (almost) every level.
 \\ The price we need to pay is to learn it and think about how we want to structure
@@ -547,52 +546,5 @@ These slides show all the Snakemake aspects that are relevant for this course. \
 you to start here: \url{https://snakemake.readthedocs.io/en/stable/tutorial/basics.html}
 \end{frame}
 % -j as a first scalability asset
-
-\subsection{benchmark}
-\begin{frame}[fragile]
-\frametitle{Benchmarking rules}
-\begin{python}
-import time
-rule to_benchmark:
-	benchmark: repeat("benchmarks/benchsleep.tsv", 10)
-    run: 
-		time.sleep(4.2)
-\end{python}
-\texttt{snakemake to\_benchmark} produce un file di 10 righe:
-\tiny{
-\begin{table}
-\centering
-\begin{tabular}{lllllllll}
-s      & h:m:s   & max\_rss & max\_vms & max\_uss & max\_pss & io\_in & io\_out & mean\_load  \\
-4.2141 & 0:00:04 & 25.92    & 249.45   & 16.96    & 18.04    & 0.21   & 0.00    & 3.08        \\
-4.2218 & 0:00:04 & 26.18    & 249.45   & 17.00    & 18.08    & 0.21   & 0.00    & 2.83        \\
-4.2245 & 0:00:04 & 26.18    & 249.45   & 17.02    & 18.10    & 0.21   & 0.00    & 2.83       
-\end{tabular}
-\end{table}
-}
-\end{frame}
-
-\begin{frame}[fragile]
-\frametitle{Benchmarking stats}
-\footnotesize{
-\begin{itemize}
-\item \textbf{s}: secondi
-\item \textbf{h:m:s}: \textcolor{novak}{ore:minuti:secondi}
-\item \textbf{max\_rss}: \textcolor{galon}{max resident set size}, massima memoria RAM usata dal processo
-\item \textbf{max\_vms}: max virtual memory size, la memoria virtuale include la RAM di sopra ma ha altre porzioni (che risiedono su disco e non nella RAM)
-\item \textbf{max\_uss}: max unique set size: memoria assegnata unicamente a questo processo
-\item \textbf{max\_pss}: max proportional set size, stima che considera la condivisione con altri processi di memoria
-\item \textbf{io\_in}: Mb letti (?)
-\item \textbf{io\_out}: Mb scritti
-\item \textbf{mean\_load}: carico medio del sistema ($\sim$ numero di processi in esecuzione)
-\end{itemize}
-}
-Un file di benchmark puo` essere a sua volta input di una regola che calcola medie e altre informazioni
-riassuntive. \\
-Su sistemi operativi diversi da linux potreste avere meno voci!
-\end{frame}
-
-%https://docs.google.com/presentation/d/1K9Y-EuirRfEBMErjx8WgKTe8LlI0decL-KsORn4DAwc/edit#slide=id.gf7c04f0c33_0_15
-
 
 \end{document}
