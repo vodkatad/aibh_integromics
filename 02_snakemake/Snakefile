@@ -54,3 +54,17 @@ rule count_reads_R1_precedence:
         with open(output.n, "w") as of:
             of.write("{}\n".format(n_rows/4))
 
+
+
+def get_samples_id(file):
+    res = []
+    with open(file,  'r') as f:
+        f.readline()
+        for line in f:
+            line = line.rstrip('\n')
+            fields = line.split('\t')
+            res.append(fields[0])
+    return(res)
+
+#SAMPLES_FILE=get_samples_id('sample_sheet.tsv')
+#print(SAMPLES_FILE)
