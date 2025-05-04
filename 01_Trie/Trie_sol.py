@@ -69,33 +69,34 @@ class TrieNode:
 
     def match(self, genome, matching_pattern, pos):
         if len(self.children) == 0 and matching_pattern != '':
-            print('Match with {}'.format(matching_pattern))
-            print('', pos) # end = ''
+            #print('Match with {}'.format(matching_pattern))
+            #print(pos) # end = ''
+            print(pos, ' ', end = '')
         if len(genome) != 0:
             for c in self.children:
                 if c.base == genome[0]:
                     c.match(genome[1:], matching_pattern + c.base, pos)
 
-
-
 if __name__ == '__main__':
     # 01 read the patterns from a file, each pattern on a row, precondition of no prefixes does not need to be checked [could be a bonus exercise]
     # 02 build the trie
     trie = Trie()
-    with open('patterns_FC.txt', 'r') as pattern_file:
+    #with open('patterns_FC.txt', 'r') as pattern_file:
+    with open('patterns_ros3.txt', 'r') as pattern_file:
         for line in pattern_file:
                 line = line.rstrip('\n')
                 trie.add_pattern(line)
     
-    #trie.print_brutal()
+    # trie.print_brutal()
     # 02 print the tree with treelib
-    trie.print_ascii()
+    #trie.print_ascii()
     # 03 print the adjacency list in the format required by Rosalind
     #trie.print_adjacency()
 
     # 04 read a genome (putting together multiple lines of a txt) and look for matching patterns
     genome = ''
-    with open('genome_FC.txt', 'r') as pattern_file:
+    #with open('genome_FC.txt', 'r') as pattern_file:
+    with open('genome_ros3.txt', 'r') as pattern_file:
         for line in pattern_file:
                 line = line.rstrip('\n')
                 genome = genome + line
