@@ -32,7 +32,7 @@ You'll need several files for this lab:
 - list of protein coding genes
 - cluster labels for PDX
 
-You can download them all from here: TODO, they are available on our server here: TODO
+You can download them all from moodle, they are available on our server here: TODO
 
 We will first load all the datasets and do some cleaning, specifically we need to:
 - keep only the PDX from liver mets, to get a homogeneous cohort (we also have some PDX from primary tumors)
@@ -76,7 +76,7 @@ expr_t <- read.table(gzfile(tcga_expr_f), sep="\t", header=T, row.names=1)
 methy_t <- read.table(gzfile(tcga_methy_f), sep="\t", header=T, row.names=1)
 
 # TCGA had ENSG as gene identifiers, I used a library (ask if you are curious)
-# to traduce them to gene symbol but then I have some ENSG that corresponds to 
+# to traduce them to gene symbol but then I ended up with some ENSG that corresponds to 
 # two different genes...in the real world I would need to determine if this
 # is common enough to require me to made a choice, here we have limited computational
 # power so we get a shortcut: remove all the genes with multiple translations 

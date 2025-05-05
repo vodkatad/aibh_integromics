@@ -1,19 +1,13 @@
-## All rules should be executed in a shell with the environment that you used with Prof. Molineris loaded:
-# $ conda
-
-# Bioinfo lessons:
-# https://docs.google.com/presentation/d/1bfdVoH5QiCijTPSb-H2zYP0METFRGbfHepQ5zJytpDY/edit#slide=id.g98431aadc5_0_1103
-# https://docs.google.com/presentation/d/1K9Y-EuirRfEBMErjx8WgKTe8LlI0decL-KsORn4DAwc/edit#slide=id.gf7c04f0c33_0_15
-
 SAMPLES = ['a','b','c','d','e']
 
-INDEX_DIR='/home/imolineris/biotech4neuron_lessons/dataset/ucsc/dm6_STAR_index'
-GTF='/home/imolineris/biotech4neuron_lessons/dataset/ucsc/ENCODE.gtf'
-BED='/home/imolineris/biotech4neuro_lessons/dataset/ucsc/dm6_ensembl.bed'
+INDEX_DIR='/home/stud0/annotations/dm6_STAR_index'
+GTF='/home/stud0/annotations/ENCODE.gtf'
+BED='/home/stud0/annotations/dm6_ensembl.bed'
 
-MAP='/home/elenagrassi/biotech4neuro/material/19/map_droso.tsv'
+MAP='/home/stud0/aibh_integromics/03_rna_snake/map_droso.tsv'
+FQ_DIR='/home/stud0/aibh_integromics/03_rna_snake/fastq'
 
-# ...
+THREADS=1
 
 ########################  QC 
 
@@ -34,7 +28,7 @@ rule featureCount:
 
 rule all_counts:
     # ...
-    script: "merge_counts.R"
+    script: "merge_counts.R" # or run: python code
 
 ######################## Find expressed genes and produce bed for them
 
@@ -51,12 +45,3 @@ rule bed_expressed_genes:
 ######################## Call geneBody_covereage for sample a and e
 
 # ...
-
-######################## Find expressed genes -  bash version
-
-# ...
-
-
-#(base) elenagrassi@biotech4neuro:~/biotech4neuro/material/19/solutions$ time snakemake -j 1 expr.bed  expressed_genes_bash.tsv sample_e.geneBodyCoverage.curves.pdf
-# very fast
-# 25M total
