@@ -1,5 +1,5 @@
 #!/usr/bin/env R
-setwd('~/biotech4neuro/material/19')
+setwd('~/Insync/elena.grassi@ircc.it/Google Drive/teach/integromics/03_rna_snake/solutions')
 seqs <- read.table('droso.txt', comment.char="#", stringsAsFactors=FALSE)
 
 n_reads <- 1000
