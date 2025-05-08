@@ -33,7 +33,7 @@ rule align:
 rule featureCount:
     input: bam="sample_{sample}_Aligned.sortedByCoord.out.bam", gtf=GTF
     output: "sample_{sample}_counts.tsv"
-    params: index=INDEX_DIR, threads=THREADS
+    params: threads=THREADS
     shell: 
         """
             featureCounts -o {output} -T {params.threads} -t exon -g gene_name -s 0 -a {input.gtf} {input.bam}

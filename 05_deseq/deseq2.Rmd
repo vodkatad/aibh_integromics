@@ -1,0 +1,111 @@
+---
+title: "DESeq2"
+output: html_document
+date: "2025-05-08"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(DESeq2)
+library(RColorBrewer)
+library(pheatmap)
+counts_f <- '/home/stud0/aibh_integromics/05_deseq/data/counts_HX.tsv.gz'
+gene_len_f <- '/home/stud0/aibh_integromics/05_deseq/data/gene_len.txt'
+image_f <- '/home/stud0/aibh_integromics/05_deseq/data/image.RData'
+```
+
+## Loading data, initial filtering and building DESeq2 analysis object.
+
+It's commont to filter very lowly expressed genes before loading the counts
+in DESeq2, the precise threshold should be project specific. Here I am keeping
+genes with more than 5 reads in at least 10 samples, a little bit more strict
+that what I use normally to work with smaller matrices. The idea is that genes with very
+few reads in few samples (this few is compared to the size of the groups we are comparing)
+were too lowly expressed in our samples to be accurately measured by our RNAseq experiment.
+
+See 'Pre-filtering' here for more info: https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html, 
+this is not required since DESeq2 won't apply its test to lowly expressed genes anyway, but makes the analysis
+more efficient and does not change overall results.
+
+```{r loading}
+count_data <- read.table(gzfile(counts_f), header=TRUE, sep="\t", row=1)
+nrow(count_data)
+minc <- 10
+minsamples <- 11
+
+efilterGenes <- rowSums(count_data > minc) < minsamples
+nrow(count_data[!efilterGenes,])
+```
+
+## Creating our samples sheet and definig the design formula
+
+We have a dataset with colorectal cancer samples collected from human tumors and some derived xenografts, we want
+to identify the DEG between these two groups and determine if the FPKM normalization leads to the expected bias
+with respect to the DESeq2 one due to genes expressed only in the human tumors (why do we expect them?).
+
+From the samples names it's easy to discriminate human and xenos: the contain LMH or LMX respectively.
+The first 7 characters of the names identify the patients, so we annotate also this information.
+
+```{r samplesheet}
+sample_sheet <- data.frame(row.names=colnames(count_data), class=ifelse(grepl('LMH', colnames(count_data)), 'human', 'xeno'),
+                           model=substr(colnames(count_data), 0, 7))
+
+fdesign <- as.formula('~class+model')
+```
+
+
+```{r deseq}
+
+dds <- DESeqDataSetFromMatrix(countData = count_data, colData = sample_sheet, design = fdesign)
+# filterGenes are the genes that will be removed cause they have 'noise reads' in less than minsamples
+filterGenes <- rowSums(counts(dds) > minc) < minsamples
+dds <- dds[!filterGenes] 
+dds <- DESeq(dds, parallel=TRUE, betaPrior=TRUE) # TODO http://37.59.25.166:8787/help/library/DESeq2/help/nbinomWaldTest
+save.image(image_f) # slow step (order of minutes, 15'?) 
+vsd <- vst(dds, blind=FALSE) # blind=TRUE for QA
+
+sampleDists <- dist(t(assay(vsd)))
+sampleDistMatrix <- as.matrix(sampleDists)
+rownames(sampleDistMatrix) <- colnames(vsd)
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, annotation_row = sample_sheet[, c('class'), drop=F], show_rownames = F)
+plotPCA(vsd, intgroup='class')
+
+```
+
+```{r fpkm}
+               
+cc <- counts(dds,normalized=TRUE)
+
+lens <- read.table(len, sep="\t", header=TRUE) # TODO differenza
+order <- rownames(mcols(dds))
+lens <- lens[match(order, lens$Geneid), ]
+
+mcols(dds)$basepairs  <- lens$length
+fpkm_d <- fpkm(dds)
+
+save.image(image_f)
+
+```
+
+```{r deg}
+res <- results(dds, alpha=alpha, contrast=con, parallel=parallel)
+        resnona$sign <- ifelse(abs(resnona$log2FoldChange) > lfc & resnona$padj < alpha, "both", ifelse(abs(resnona$log2FoldChange) > lfc, "LFC",
+                                                                                                                           ifelse(resnona$padj < alpha, "padj", "NS")))
+        resnona$sign <- factor(resnona$sig, levels=c("LFC", "padj", "both", "NS"))
+        resnona[resnona$padj ==0,"padj"] <- .Machine$double.xmin
+        p <- ggplot(resnona, aes(log2FoldChange, -log10(padj))) +
+                    geom_point(aes(col = sign),size=0.5) + theme_bw() +
+                    scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#999999"), drop=FALSE) + # red orange green black -> orange blue green gray 
+                    ggtitle(title)
+
+        nsign <- nrow(resnona[resnona$sig=="both",])
+        if (nsign > 20) {
+            p + geom_text_repel(data=resnona[1:10,], aes(label=rownames(resnona)[1:10]))
+        } else {
+            p + geom_text_repel(data=resnona[resnona$sig=="both",], aes(label=rownames(resnona[resnona$sig=="both",])))
+        }
+
+
+```
