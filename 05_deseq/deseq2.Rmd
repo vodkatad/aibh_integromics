@@ -6,11 +6,17 @@ date: "2025-05-08"
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r setup2}
 library(DESeq2)
 library(RColorBrewer)
 library(pheatmap)
+library(clusterProfiler)
+library(msigdb)
+
 counts_f <- '/home/stud0/aibh_integromics/05_deseq/data/counts_HX.tsv.gz'
-gene_len_f <- '/home/stud0/aibh_integromics/05_deseq/data/gene_len.txt'
+gene_len_f <- '/home/stud0/aibh_integromics/05_deseq/data/gene_lengths.txt'
 image_f <- '/home/stud0/aibh_integromics/05_deseq/data/image.RData'
 ```
 
@@ -18,7 +24,7 @@ image_f <- '/home/stud0/aibh_integromics/05_deseq/data/image.RData'
 
 It's commont to filter very lowly expressed genes before loading the counts
 in DESeq2, the precise threshold should be project specific. Here I am keeping
-genes with more than 5 reads in at least 10 samples, a little bit more strict
+genes with more than 5 reads in at least 4 samples, a little bit more strict
 that what I use normally to work with smaller matrices. The idea is that genes with very
 few reads in few samples (this few is compared to the size of the groups we are comparing)
 were too lowly expressed in our samples to be accurately measured by our RNAseq experiment.
@@ -31,13 +37,13 @@ more efficient and does not change overall results.
 count_data <- read.table(gzfile(counts_f), header=TRUE, sep="\t", row=1)
 nrow(count_data)
 minc <- 10
-minsamples <- 11
+minsamples <- 5
 
 efilterGenes <- rowSums(count_data > minc) < minsamples
 nrow(count_data[!efilterGenes,])
 ```
 
-## Creating our samples sheet and definig the design formula
+## Creating our samples sheet and defining the design formula
 
 We have a dataset with colorectal cancer samples collected from human tumors and some derived xenografts, we want
 to identify the DEG between these two groups and determine if the FPKM normalization leads to the expected bias
@@ -47,12 +53,25 @@ From the samples names it's easy to discriminate human and xenos: the contain LM
 The first 7 characters of the names identify the patients, so we annotate also this information.
 
 ```{r samplesheet}
-sample_sheet <- data.frame(row.names=colnames(count_data), class=ifelse(grepl('LMH', colnames(count_data)), 'human', 'xeno'),
+sample_sheet <- data.frame(row.names=colnames(count_data), 
+                           class=ifelse(grepl('LMH', colnames(count_data)), 'human', 'xeno'),
                            model=substr(colnames(count_data), 0, 7))
 
 fdesign <- as.formula('~class+model')
 ```
 
+## Creating our DESeq2 object, filtering lowly expressed genes and initial plots 
+
+DeSeq2 can (with betaPrior=TRUE) shrink the logFC for genes with low counts or high dispersion values:
+
+![LFC shrinkage]('/home/stud0/aibh_integromics/05_deseq/deseq2_shrunken_lfc.png')
+
+They have developed a different way to do the shrinkage and set the default to betaPrior=FALSE
+from version 1.16.0 onwards, where shrinkage needs to be done separately, I did not notice large
+differences when I tried it on some dataset so I kept betaPrior=TRUE, but it makes sense
+to try different approaches for different/new datasets.
+Then we plot an heatmap of the euclidean distances between samples and a PCA, marking human
+and xeno samples.
 
 ```{r deseq}
 
@@ -60,8 +79,14 @@ dds <- DESeqDataSetFromMatrix(countData = count_data, colData = sample_sheet, de
 # filterGenes are the genes that will be removed cause they have 'noise reads' in less than minsamples
 filterGenes <- rowSums(counts(dds) > minc) < minsamples
 dds <- dds[!filterGenes] 
-dds <- DESeq(dds, parallel=TRUE, betaPrior=TRUE) # TODO http://37.59.25.166:8787/help/library/DESeq2/help/nbinomWaldTest
-save.image(image_f) # slow step (order of minutes, 15'?) 
+start.time <- Sys.time()
+dds <- DESeq(dds, parallel=TRUE, betaPrior=TRUE) # https://hbctraining.github.io/DGE_workshop/lessons/05_DGE_DESeq2_analysis2.html
+# new shrinkage method suggested here: https://academic.oup.com/bioinformatics/article/35/12/2084/5159452
+# accessible with betaPrior=FALSE and lfcShrink()
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+print(time.taken)
+#save.image(image_f) # slow step (order of minutes, 15'?) 
 vsd <- vst(dds, blind=FALSE) # blind=TRUE for QA
 
 sampleDists <- dist(t(assay(vsd)))
@@ -71,41 +96,92 @@ colnames(sampleDistMatrix) <- NULL
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
 pheatmap(sampleDistMatrix, clustering_distance_rows=sampleDists, clustering_distance_cols=sampleDists, col=colors, annotation_row = sample_sheet[, c('class'), drop=F], show_rownames = F)
 plotPCA(vsd, intgroup='class')
+plotPCA(vsd, intgroup='model')
 
 ```
+## Finding the differentially expressed genes between human samples and xenografts
 
-```{r fpkm}
-               
-cc <- counts(dds,normalized=TRUE)
-
-lens <- read.table(len, sep="\t", header=TRUE) # TODO differenza
-order <- rownames(mcols(dds))
-lens <- lens[match(order, lens$Geneid), ]
-
-mcols(dds)$basepairs  <- lens$length
-fpkm_d <- fpkm(dds)
-
-save.image(image_f)
-
-```
+DESeq2 can compare, via glm, different subsets of our samples depending on how we setup our sample sheet, we need
+to tell him which contrast we are interested in with a vector made of: sample sheet column name and then the two levels
+that we want to compare.
+DESeq2 assign a NA pvalue to the genes with too low expression level to get a consistent statistic (this is why 
+the initial filtering we did is useful for efficiency but not to limit our multiple test corrections).
 
 ```{r deg}
-res <- results(dds, alpha=alpha, contrast=con, parallel=parallel)
-        resnona$sign <- ifelse(abs(resnona$log2FoldChange) > lfc & resnona$padj < alpha, "both", ifelse(abs(resnona$log2FoldChange) > lfc, "LFC",
-                                                                                                                           ifelse(resnona$padj < alpha, "padj", "NS")))
-        resnona$sign <- factor(resnona$sig, levels=c("LFC", "padj", "both", "NS"))
-        resnona[resnona$padj ==0,"padj"] <- .Machine$double.xmin
-        p <- ggplot(resnona, aes(log2FoldChange, -log10(padj))) +
-                    geom_point(aes(col = sign),size=0.5) + theme_bw() +
-                    scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#999999"), drop=FALSE) + # red orange green black -> orange blue green gray 
-                    ggtitle(title)
+lfc <- 0.58
+alpha <- 0.05
+res <- results(dds, alpha=alpha, contrast=c('class','human','xeno'))
+resnona <- res[!is.na(res$pvalue) & !is.na(res$padj),]
+resnona$sign <- ifelse(abs(resnona$log2FoldChange) > lfc & resnona$padj < alpha, "both", 
+                       ifelse(abs(resnona$log2FoldChange) > lfc, "LFC", ifelse(resnona$padj < alpha, "padj", "NS")))
+resnona$sign <- factor(resnona$sign, levels=c("LFC", "padj", "both", "NS"))
+if (any(resnona$padj == 0)) {
+resnona[resnona$padj == 0, "padj"] <- .Machine$double.xmin
+}
+p <- ggplot(resnona, aes(log2FoldChange, -log10(padj))) +
+  geom_point(aes(col = sign),size=0.5) + theme_bw() +
+  scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#999999"), drop=FALSE) +
+  ggtitle('Volcano Plot human vs xeno')
 
-        nsign <- nrow(resnona[resnona$sig=="both",])
-        if (nsign > 20) {
-            p + geom_text_repel(data=resnona[1:10,], aes(label=rownames(resnona)[1:10]))
-        } else {
-            p + geom_text_repel(data=resnona[resnona$sig=="both",], aes(label=rownames(resnona[resnona$sig=="both",])))
-        }
+nsign <- nrow(resnona[resnona$sig=="both",])
+if (nsign > 20) {
+  p + geom_text_repel(data=resnona[1:10,], aes(label=rownames(resnona)[1:10]))
+} else {
+  p + geom_text_repel(data=resnona[resnona$sig=="both",], aes(label=rownames(resnona[resnona$sig=="both",])))
+}
+p
 
+```
+## Normalized counts and FPKM
+```{r fpkm}
+lens <- read.table(gene_len_f, sep="\t", header=TRUE)
+order <- rownames(mcols(dds))
+lens <- lens[lens$Geneid %in% order,]
+lens <- lens[match(order, lens$Geneid), ]
+mcols(dds)$basepairs  <- lens$length
+fpkm_d <- fpkm(dds, robust=TRUE) # the default
+fpkm_nonorm <- fpkm(dds, robust=FALSE)
+```
+
+## Check normalizations results
+
+```{r norm}
+head(resnona[order(-resnona$log2FoldChange),])
+plotCounts(dds, 'FN1', intgroup = 'class')
+count_data['FN1',]
+```
+
+Let's see if this large overexpression of many genes (e.g. Fibronectin) in the human samples makes the DESeq2 normalization for other genes better
+than the classic FPKM. We need to see if a genes without different expression levels looks abnormally high in xenografts due to this
+'lack of diluition' (or the other way around).
+
+```{r norm}
+resnona['KRAS',]
+plotCounts(dds, 'KRAS', intgroup = 'class')
+norm <- fpkm_d['KRAS',]
+vanilla <- fpkm_nonorm['KRAS', ]
+names <- c(names(vanilla), names(norm))
+pd <- data.frame(values=c(vanilla, norm), 
+                 method=c(rep('vanilla', length(vanilla)), rep('deseq', length(vanilla))), 
+                sample = ifelse(grepl('X', names), 'xeno', 'human'))
+ggplot(data=pd, aes(y=values,x=sample))+geom_boxplot(outlier.shape=NA)+
+  geom_jitter()+facet_wrap(~method)+theme_bw()
+
+round(fpkm_d['FN1',], 4)
+round(fpkm_nonorm['KRAS',], 4)
+```
+
+## Hallmark GSEA analysis with clusterProfiler
+```{r gsea}
+geneList <- resnona$log2FoldChange
+names(geneList) <- rownames(resnona)
+geneList <- sort(geneList, decreasing = TRUE)
+
+m_t2g <- msigdbr(species = "Homo sapiens", collection = 'H')[, c('gs_name', 'gene_symbol')]
+
+em <- GSEA(geneList, TERM2GENE=m_t2g, pvalueCutoff = 1)
+head(em@result)
+#ridgeplot(em, showCategory = 20)
+#gseaplot2(em, geneSetID = 1, title = em$Description[1])
 
 ```
