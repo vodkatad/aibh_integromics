@@ -118,7 +118,7 @@ the initial filtering we did is useful for efficiency but not to limit our multi
 ```{r deg}
 lfc <- 0.58
 alpha <- 0.05
-res <- results(dds, alpha=alpha, contrast=c('class','human','xeno'))
+res <- results(dds, alpha=alpha, contrast=c('class','human','xeno')) # indepedentFiltering=T by default
 resnona <- as.data.frame(res[!is.na(res$pvalue) & !is.na(res$padj),])
 resnona$sign <- ifelse(abs(resnona$log2FoldChange) > lfc & resnona$padj < alpha, "both", 
                        ifelse(abs(resnona$log2FoldChange) > lfc, "LFC", ifelse(resnona$padj < alpha, "padj", "NS")))
@@ -130,14 +130,13 @@ p <- ggplot(resnona, aes(log2FoldChange, -log10(padj))) +
   geom_point(aes(col = sign),size=0.5) + theme_bw() +
   scale_color_manual(values = c("#E69F00", "#56B4E9", "#009E73", "#999999"), drop=FALSE) +
   ggtitle('Volcano Plot human vs xeno')
-
 nsign <- nrow(resnona[resnona$sig=="both",])
-if (nsign > 20) {
+resnona <- resnona[order(resnona$padj),]
+if (nsign > 10) {
   p + geom_text_repel(data=resnona[1:10,], aes(label=rownames(resnona)[1:10]))
 } else {
   p + geom_text_repel(data=resnona[resnona$sig=="both",], aes(label=rownames(resnona[resnona$sig=="both",])))
 }
-
 ```
 
 ## Normalized counts and FPKM
@@ -155,9 +154,7 @@ fpkm_nonorm <- fpkm(dds, robust=FALSE)
 ## Check normalizations results
 
 ```{r norm}
-head(resnona[order(-resnona$log2FoldChange),])
 plotCounts(dds, 'FN1', intgroup = 'class')
-count_data['FN1',]
 ```
 
 Let's see if this large overexpression of many genes (e.g. Fibronectin) in the human samples makes the DESeq2 normalization for other genes better
