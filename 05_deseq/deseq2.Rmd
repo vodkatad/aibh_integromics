@@ -1,6 +1,8 @@
 ---
 title: "DESeq2"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 date: "2025-05-08"
 ---
 
@@ -10,22 +12,32 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r setup2}
 library(DESeq2)
-library(RColorBrewer)
-library(pheatmap)
+# gene enrichment libraries
 library(clusterProfiler)
 library(msigdb)
+library(enrichplot)
+# plotting libraries:
+library(ggplot2)
+library(ggrepel)
+library(RColorBrewer)
+library(pheatmap)
 
 counts_f <- '/home/stud0/aibh_integromics/05_deseq/data/counts_HX.tsv.gz'
 gene_len_f <- '/home/stud0/aibh_integromics/05_deseq/data/gene_lengths.txt'
-image_f <- '/home/stud0/aibh_integromics/05_deseq/data/image.RData'
+hallmark_rds <- '/home/stud0/aibh_integromics/05_deseq/data/hallm.rds'
 ```
+## Differential expression lab
 
-## Loading data, initial filtering and building DESeq2 analysis object.
+We have a dataset with colorectal cancer samples (n=9) collected from human tumors (n=4) and some derived xenografts (n=5), we want
+to identify the DEG between these two groups and determine if the FPKM normalization leads to the expected bias
+with respect to the DESeq2 one due to genes expressed only in the human tumors (why do we expect them?).
 
-It's commont to filter very lowly expressed genes before loading the counts
+## Loading data, initial lowly expressed genes filtering evaluation
+
+It's common to filter very lowly expressed genes before loading the counts
 in DESeq2, the precise threshold should be project specific. Here I am keeping
 genes with more than 5 reads in at least 4 samples, a little bit more strict
-that what I use normally to work with smaller matrices. The idea is that genes with very
+that what I use normally, to have a quicker execution time for the lab. The idea is that genes with very
 few reads in few samples (this few is compared to the size of the groups we are comparing)
 were too lowly expressed in our samples to be accurately measured by our RNAseq experiment.
 
@@ -45,10 +57,6 @@ nrow(count_data[!efilterGenes,])
 
 ## Creating our samples sheet and defining the design formula
 
-We have a dataset with colorectal cancer samples collected from human tumors and some derived xenografts, we want
-to identify the DEG between these two groups and determine if the FPKM normalization leads to the expected bias
-with respect to the DESeq2 one due to genes expressed only in the human tumors (why do we expect them?).
-
 From the samples names it's easy to discriminate human and xenos: the contain LMH or LMX respectively.
 The first 7 characters of the names identify the patients, so we annotate also this information.
 
@@ -64,7 +72,11 @@ fdesign <- as.formula('~class+model')
 
 DeSeq2 can (with betaPrior=TRUE) shrink the logFC for genes with low counts or high dispersion values:
 
-![LFC shrinkage]('/home/stud0/aibh_integromics/05_deseq/deseq2_shrunken_lfc.png')
+```{r, echo=FALSE}
+knitr::include_graphics('/home/stud0/aibh_integromics/05_deseq/deseq2_shrunken_lfc.png', dpi=0.5)
+
+```
+
 
 They have developed a different way to do the shrinkage and set the default to betaPrior=FALSE
 from version 1.16.0 onwards, where shrinkage needs to be done separately, I did not notice large
@@ -76,17 +88,12 @@ and xeno samples.
 ```{r deseq}
 
 dds <- DESeqDataSetFromMatrix(countData = count_data, colData = sample_sheet, design = fdesign)
-# filterGenes are the genes that will be removed cause they have 'noise reads' in less than minsamples
+# filterGenes are the genes that will be removed cause they have more than minc reads in less than min samples
 filterGenes <- rowSums(counts(dds) > minc) < minsamples
 dds <- dds[!filterGenes] 
-start.time <- Sys.time()
 dds <- DESeq(dds, parallel=TRUE, betaPrior=TRUE) # https://hbctraining.github.io/DGE_workshop/lessons/05_DGE_DESeq2_analysis2.html
 # new shrinkage method suggested here: https://academic.oup.com/bioinformatics/article/35/12/2084/5159452
 # accessible with betaPrior=FALSE and lfcShrink()
-end.time <- Sys.time()
-time.taken <- end.time - start.time
-print(time.taken)
-#save.image(image_f) # slow step (order of minutes, 15'?) 
 vsd <- vst(dds, blind=FALSE) # blind=TRUE for QA
 
 sampleDists <- dist(t(assay(vsd)))
@@ -99,6 +106,7 @@ plotPCA(vsd, intgroup='class')
 plotPCA(vsd, intgroup='model')
 
 ```
+
 ## Finding the differentially expressed genes between human samples and xenografts
 
 DESeq2 can compare, via glm, different subsets of our samples depending on how we setup our sample sheet, we need
@@ -111,12 +119,12 @@ the initial filtering we did is useful for efficiency but not to limit our multi
 lfc <- 0.58
 alpha <- 0.05
 res <- results(dds, alpha=alpha, contrast=c('class','human','xeno'))
-resnona <- res[!is.na(res$pvalue) & !is.na(res$padj),]
+resnona <- as.data.frame(res[!is.na(res$pvalue) & !is.na(res$padj),])
 resnona$sign <- ifelse(abs(resnona$log2FoldChange) > lfc & resnona$padj < alpha, "both", 
                        ifelse(abs(resnona$log2FoldChange) > lfc, "LFC", ifelse(resnona$padj < alpha, "padj", "NS")))
 resnona$sign <- factor(resnona$sign, levels=c("LFC", "padj", "both", "NS"))
 if (any(resnona$padj == 0)) {
-resnona[resnona$padj == 0, "padj"] <- .Machine$double.xmin
+ resnona[resnona$padj == 0, "padj"] <- .Machine$double.xmin
 }
 p <- ggplot(resnona, aes(log2FoldChange, -log10(padj))) +
   geom_point(aes(col = sign),size=0.5) + theme_bw() +
@@ -129,10 +137,11 @@ if (nsign > 20) {
 } else {
   p + geom_text_repel(data=resnona[resnona$sig=="both",], aes(label=rownames(resnona[resnona$sig=="both",])))
 }
-p
 
 ```
+
 ## Normalized counts and FPKM
+
 ```{r fpkm}
 lens <- read.table(gene_len_f, sep="\t", header=TRUE)
 order <- rownames(mcols(dds))
@@ -153,9 +162,9 @@ count_data['FN1',]
 
 Let's see if this large overexpression of many genes (e.g. Fibronectin) in the human samples makes the DESeq2 normalization for other genes better
 than the classic FPKM. We need to see if a genes without different expression levels looks abnormally high in xenografts due to this
-'lack of diluition' (or the other way around).
+'lack of dilution' (or the other way around).
 
-```{r norm}
+```{r norm2}
 resnona['KRAS',]
 plotCounts(dds, 'KRAS', intgroup = 'class')
 norm <- fpkm_d['KRAS',]
@@ -172,16 +181,32 @@ round(fpkm_nonorm['KRAS',], 4)
 ```
 
 ## Hallmark GSEA analysis with clusterProfiler
+
+clusterProfiler is a package that offers many functions to perform GO/GSEA analysis and plot results.
+Here we'll just check the Hallmark curated collection of gene sets using our log2FoldChange to rank the genes for the GSEA analysis
+and look at enrichment plots for some manually selected gene sets.
+
 ```{r gsea}
 geneList <- resnona$log2FoldChange
 names(geneList) <- rownames(resnona)
 geneList <- sort(geneList, decreasing = TRUE)
 
-m_t2g <- msigdbr(species = "Homo sapiens", collection = 'H')[, c('gs_name', 'gene_symbol')]
 
-em <- GSEA(geneList, TERM2GENE=m_t2g, pvalueCutoff = 1)
-head(em@result)
-#ridgeplot(em, showCategory = 20)
-#gseaplot2(em, geneSetID = 1, title = em$Description[1])
+# downloading the msigdbr collection takes a little bit of time, so we skip it for the lab and load the rds object I had previously 
+# obtained and saved with the following code:
+#msig <- getMsigdb(org = 'hs', id = 'SYM', version = '7.4')
+#hallm <- subsetCollection(msig, 'h')
+#list_hall <- geneIds(hallm)
+#h_t2g <- t(as.data.frame(sapply(names(list_hall), function(x) { t(data.frame(gs=rep(x, length(list_hall[[x]])),symbol=list_hall[[x]])) })))
+#saveRDS(h_t2g, file=hallmark_rds)
+h_t2g <- readRDS(hallmark_rds)
 
+gsea_h <-  GSEA(geneList, TERM2GENE=h_t2g, pvalueCutoff = 1, nPermSimple = 10000)
+head(gsea_h@result)
+ridgeplot(gsea_h, showCategory = 20)+theme_bw(base_size=10)
+
+w1 <- which(gsea_h@result['ID']=="HALLMARK_INFLAMMATORY_RESPONSE")
+w2 <- which(gsea_h@result['ID']=="HALLMARK_E2F_TARGETS")
+gseaplot2(gsea_h, geneSetID = w1, title=gsea_h@result['ID'][w1,])
+gseaplot2(gsea_h, geneSetID = w2, title=gsea_h@result['ID'][w2,])
 ```
