@@ -1,0 +1,36 @@
+COUNTS='/home/stud0/aibh_integromics/05_deseq/data/counts_HXO.tsv.gz'
+GENE_LEN='/home/stud0/aibh_integromics/05_deseq/data/gene_lengths.txt'
+SAMPLE_SHEET='/home/stud0/aibh_integromics/05_deseq/data/samplesheet.tsv'
+H='/home/stud0/aibh_integromics/05_deseq/data/hallm.rds'
+
+rule deseq:
+    input: counts=COUNTS, gene_len=GENE_LEN, sample_sheet=SAMPLE_SHEET
+    output: deo="dds.rds", fpkm="fpkm.tsv.gz", vsdo = "vsd.rds"
+    log: log="dds.log"
+    script: "deseq.R"
+
+rule pca_plot:
+    input: vsd="vsd.rds"
+    output: plot="pca_{ss_col}.png"
+    script: "deseq_pca.R"
+
+def read_samples_col(ss):
+    with open(ss,  'r') as f:
+        line = f.readline()
+        line = line.rstrip('\n')
+        res = line.split('\t')
+    return([x for x in res if x != ""])
+
+sample_cols = read_samples_col(SAMPLE_SHEET)
+rule all_pca:
+    input: expand("pca_{ss_col}.png", ss_col=sample_cols)
+
+rule deg:
+    input: deo="dds.rds"
+    output: deg="deg_{ss_col}_{nom}.vs.{den}.tsv", volcano="deg_{ss_col}_{nom}.vs.{den}.png"
+    script: "deseq_deg.R"
+
+rule gsea:
+    input: deg="deg_{ss_col}_{nom}.vs.{den}.tsv", genesets=H
+    output: gsea="gsea_{ss_col}_{nom}.vs.{den}.tsv", gseaplot="gsea_{ss_col}_{nom}.vs.{den}.png"
+    script: "gsea.R"

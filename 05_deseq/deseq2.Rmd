@@ -46,7 +46,7 @@ this is not required since DESeq2 won't apply its test to lowly expressed genes 
 more efficient and does not change overall results.
 
 ```{r loading}
-count_data <- read.table(gzfile(counts_f), header=TRUE, sep="\t", row=1)
+count_data <- read.table(gzfile(counts_f), header=TRUE, sep="\t", row.names=1)
 nrow(count_data)
 minc <- 10
 minsamples <- 5
