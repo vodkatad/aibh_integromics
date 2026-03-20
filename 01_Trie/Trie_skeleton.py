@@ -64,5 +64,3 @@ if __name__ == '__main__':
     # 03 print the adjacency list in the format required by Rosalind
 
     # 04 implement the matching algorithm vs a genome.txt file
-
-    # 05 print with treelib

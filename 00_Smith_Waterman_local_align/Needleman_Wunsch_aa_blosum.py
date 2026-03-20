@@ -1,14 +1,11 @@
 #!/usr/bin/env python3
 
 # function to assign scores
-def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, match_score, mismatch_score, gap_score):
+def assign_scores(scores_matrix, arrows_matrix, cols_string, rows_string, scoring_matrix, gap_score):
     for i in range(1, len(rows_string)+1):
         for j in range(1, len(cols_string)+1):
             scores = [] # will be ordered match, gap on row string, gap on col string
-            if rows_string[i-1] == cols_string[j-1]:
-                scores.append(scores_matrix[i-1][j-1] + match_score)
-            else:
-                scores.append(scores_matrix[i-1][j-1] + mismatch_score)
+            scores.append(scores_matrix[i-1][j-1] + scoring_matrix[rows_string[i-1] + ':' + cols_string[j-1]])
             scores.append(scores_matrix[i][j-1] + gap_score)
             scores.append(scores_matrix[i-1][j] + gap_score)
             maxi = scores.index(max(scores)) # With ties we report the first occurrence: we prefer alignment to gaps, then gap on the rows string
@@ -53,15 +50,29 @@ def traceback_print_align(arrows_matrix, cols_string, rows_string):
     print(''.join(reversed(align_rows)))
     print(''.join(reversed(align_cols)))
 
+def load_blosum(file):
+    blosum_hash = {}
+    with open(file, 'r') as bf:
+        aa_col_line = bf.readline()
+        aa_col_line.strip()
+        # We load a list with all the aa of the first line
+        aas = aa_col_line.split()
+        for line in bf:
+            line = line.strip()
+            elements = line.split()
+            i = 1
+            for aa in aas:
+                key = aa + ":" + elements[0]
+                blosum_hash[key] = int(elements[i])
+                i += 1
+    return blosum_hash
+
+
+
 if __name__ == '__main__':
-    # define string to be aligned
-    #string_n_columns = 'CATGG'
-    #string_m_rows = 'CATCC'
-    #string_n_columns = 'GTCAAAAACCCCCCCCCCCCCCCCCC'
-    #string_m_rows = 'AAAAAGTCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC'
-    #string_n_columns = 'CAT'
-    #string_m_rows = 'CT'
-    f_dataset = 'dataset2'
+    # Input file
+    f_dataset = 'dataset_large'
+    f_blosum = 'blosum62.txt'
     
     els = []
     with open(f_dataset, 'r') as df:
@@ -71,14 +82,14 @@ if __name__ == '__main__':
 
     string_n_columns = els[0]
     string_m_rows =  els[1]
-  
+    # We will represent blosum as an hash aa-aa: score
+    blosum = load_blosum(f_blosum)
+
     n = len(string_n_columns)
     m = len(string_m_rows)
 
     # define useful constants
-    match_score = 1
-    mismatch_score = -1
-    gap_score = -1
+    gap_score = -5
 
     # build initial matrixes for scores and arrows
     scores_matrix = [[float('nan')for i in range(n+1)] for j in range(m+1)]
@@ -98,9 +109,9 @@ if __name__ == '__main__':
     #print(scores_matrix)
     # we'll keep nan in the arrows matrix and stop when we reach it
     
-    assign_scores(scores_matrix, arrows_matrix, string_n_columns, string_m_rows, match_score, mismatch_score, gap_score)
+    assign_scores(scores_matrix, arrows_matrix, string_n_columns, string_m_rows, blosum, gap_score)
     #print(scores_matrix)
     #print(arrows_matrix)
-    print('The best global alignment score between ' + string_n_columns + ' and ' + string_m_rows + ' is ' + str(scores_matrix[m][n]))
+    print(str(scores_matrix[m][n]))
 
     traceback_print_align(arrows_matrix, string_n_columns, string_m_rows)
