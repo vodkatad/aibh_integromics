@@ -3,8 +3,8 @@ from treelib import Node, Tree
 
 class Trie:
     def __init__(self):
-        self.root = TrieNode('', 1)
-        self.last_id = 1
+        self.root = TrieNode('', 0)
+        self.last_id = 0
 
     def print_adjacency(self):
         self.root.print_adjacency()
@@ -54,17 +54,9 @@ class TrieNode:
         for c in self.children:
             c.print_brutal()
 
-    def print_ascii(self, tree, parent):
-        if parent is None:
-            tree.create_node(self.base, self.n_id)
-        else:
-            tree.create_node(self.base, self.n_id, parent=parent.n_id)
-        for c in self.children:
-            c.print_ascii(tree, self)
-
     def print_adjacency(self):
         for c in self.children:
-            print("{} {} {}".format(self.n_id, c.n_id, c.base))
+            print("{}->{}:{}".format(self.n_id, c.n_id, c.base))
             c.print_adjacency()
 
     def match(self, genome, matching_pattern, pos):
@@ -82,7 +74,7 @@ if __name__ == '__main__':
     # 02 build the trie
     trie = Trie()
     #with open('patterns_FC.txt', 'r') as pattern_file:
-    with open('patterns_ros3.txt', 'r') as pattern_file:
+    with open('ros', 'r') as pattern_file:
         for line in pattern_file:
                 line = line.rstrip('\n')
                 trie.add_pattern(line)
@@ -91,8 +83,8 @@ if __name__ == '__main__':
     # 02 print the tree with treelib
     #trie.print_ascii()
     # 03 print the adjacency list in the format required by Rosalind
-    #trie.print_adjacency()
-
+    trie.print_adjacency()
+    exit()
     # 04 read a genome (putting together multiple lines of a txt) and look for matching patterns
     genome = ''
     #with open('genome_FC.txt', 'r') as pattern_file:

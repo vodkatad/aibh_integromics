@@ -1,0 +1,47 @@
+SAMPLES = ['a','b','c','d','e']
+
+INDEX_DIR='/home/stud0/annotations/dm6_STAR_index'
+GTF='/home/stud0/annotations/ENCODE.gtf'
+BED='/home/stud0/annotations/dm6_ensembl.bed'
+
+MAP='/home/stud0/aibh_integromics/03_rna_snake/map_droso.tsv'
+FQ_DIR='/home/stud0/aibh_integromics/03_rna_snake/fastq'
+
+THREADS=1
+
+########################  QC 
+
+
+rule all_qc:
+# ...
+
+rule fastqc:
+# ...
+
+######################## Align and count
+
+rule align:
+# ...
+
+rule featureCount:
+# ...
+
+rule all_counts:
+    # ...
+    script: "merge_counts.R" # or run: python code
+
+######################## Find expressed genes and produce bed for them
+
+rule extract_expressed_genes:
+    # ...
+    
+rule translate_to_ensembl:
+    input: counts="expressed_genes_counts.tsv", map=MAP
+    # ...
+    
+rule bed_expressed_genes:
+    # ...
+    
+######################## Call geneBody_covereage for sample a and e
+
+# ...

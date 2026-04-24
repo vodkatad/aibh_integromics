@@ -1,0 +1,72 @@
+import gzip 
+rule count_reads_naive:
+    input: fq="fastq/a.fastq.gz"
+    output: n="a_n_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+        
+rule count_reads:
+    input: fq="fastq/{sample}.fastq.gz"
+    output: n="{sample}_n_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+
+
+SAMPLES = ['a', 'b', 'c', 'd']
+rule all_n_reads:
+   input: expand("{sample}_n_reads.txt", sample=SAMPLES)
+
+rule all_counts:
+   input: expand("{sample}_n_reads.txt", sample=SAMPLES)
+   output: "all_n_reads.txt"
+   shell: "cat {input} > {output}"
+
+rule plot:
+    input: n="all_n_reads.txt"
+    output: plot="n_reads.png"
+    script: "histogram_reads.R"
+
+def find_R1_or_other(wildcards):
+    import os
+    if os.path.isfile(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz')) and os.path.isfile(os.path.join('fastq', wildcards.sample+'.fastq.gz')) :
+        raise RuntimeError('Error cannot have paired and single end together')
+    elif os.path.isfile(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz')):
+        return(os.path.join('fastq', wildcards.sample+'.R1.fastq.gz'))
+    else:
+        return(os.path.join('fastq', wildcards.sample+'.fastq.gz'))
+
+rule count_reads_R1_precedence:
+    input: fq=find_R1_or_other
+    output: n="{sample}_nn_reads.txt"
+    run: 
+        n_rows = 0
+        with gzip.open(input.fq, "rb") as fq:
+            for line in fq:
+                n_rows = n_rows + 1
+        with open(output.n, "w") as of:
+            of.write("{}\n".format(n_rows/4))
+
+
+
+def get_samples_id(file):
+    res = []
+    with open(file,  'r') as f:
+        f.readline()
+        for line in f:
+            line = line.rstrip('\n')
+            fields = line.split('\t')
+            res.append(fields[0])
+    return(res)
+
+#SAMPLES_FILE=get_samples_id('sample_sheet.tsv')
+#print(SAMPLES_FILE)

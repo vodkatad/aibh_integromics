@@ -1,0 +1,7 @@
+- 1.5h snake tech (no intro motivazionale) + fastqc/star
+- add slides on defining SAMPLES programmatically
+- add explicit slide on input/output in python scripts  snakemake.input[0] .input['name'] TODO provare
+
+
+- Rmd guidato deseq basato su vignetta su count piccolino + GO o GSEA
+- esempio gustoso in cui traducono da Rmd a Rscript e splittano in regole / generalizzano con wildcard il confronto da fare

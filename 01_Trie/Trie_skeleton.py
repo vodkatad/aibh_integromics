@@ -2,17 +2,14 @@
 # https://rosalind.info/classes/enroll/50f3beb237/
 class Trie:
     def __init__(self):
-        self.root = TrieNode('', 1)
-        self.last_id = 1
+        self.root = TrieNode('', 0)
+        self.last_id = 0
 
     def print_adjacency(self):
         pass
 
     def print_brutal(self):
         self.root.print_brutal()
-
-    def print_ascii(self):
-        pass
 
     def add_pattern(self, pattern):
         pass
@@ -40,9 +37,6 @@ class TrieNode:
         for c in self.children:
             c.print_brutal()
 
-    def print_ascii(self, tree, parent):
-        pass
-
     def print_adjacency(self):
         pass
 
@@ -50,10 +44,10 @@ class TrieNode:
         pass
 
 if __name__ == '__main__':
-    # 01 read the patterns from a file, each pattern on a row, precondition of no prefixes does not need to be checked [could be a bonus exercise]
+    # 01 read the patterns from a file, each pattern on a row, precondition of no prefixes does not need to be checked
     # 02 meanwhile build the trie
     trie = Trie()
-    with open('patterns_FC.txt', 'r') as pattern_file:
+    with open('patterns_00.txt', 'r') as pattern_file:
         for line in pattern_file:
                 line = line.rstrip('\n')
                 trie.add_pattern(line)

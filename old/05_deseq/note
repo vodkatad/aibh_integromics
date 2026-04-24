@@ -1,0 +1,52 @@
+egrassi@godot:/scratch/trcanmed/DE_RNASeq/dataset/Class_comparison_biobanca$ grep LMH samples_datas > /tmp/aibh/wanted
+egrassi@godot:/scratch/trcanmed/DE_RNASeq/dataset/Class_comparison_biobanca$ grep LMX samples_datas | head -n 65 >> /tmp/aibh/wanted
+
+aggiungo LMO per esercizio loro:
+egrassi@godot:/scratch/trcanmed/DE_RNASeq/dataset/Class_comparison_biobanca$ cp /tmp/aibh/wanted /tmp/aibh/wanted2
+egrassi@godot:/scratch/trcanmed/DE_RNASeq/dataset/Class_comparison_biobanca$ grep LMO samples_datas | head -n 10 >> /tmp/aibh/wanted2
+
+grep LMH samples_data | head -n 4 > /tmp/aibh/wanted 
+grep LMX samples_data | head -n 5  >> /tmp/aibh/wanted 
+cp /tmp/aibh/wanted /tmp/aibh/wanted2
+grep LMO samples_data | head -n 5  >> /tmp/aibh/wanted2 
+
+
+d <- read.table(gzfile('/mnt/trcanmed/snaketree/prj/RNASeq_biod_metadata/dataset/july2020_starOK/merged_hs_mm.tsv.gz'), sep="\t", header=T)
+w <- read.table('wanted') 
+w2 <- read.table('wanted2')
+d <- d[grepl('H_', d$Geneid),]
+d$Geneid <- gsub('H_', '', d$Geneid)
+dw2 <- d[, colnames(d) %in% c('Geneid', as.character(w2$V1))]
+dw <- d[, colnames(d) %in% c('Geneid', as.character(w$V1))] 
+write.table(dw, gzfile('counts_HX.tsv.gz'), sep="\t", quote=F, row.names=F)
+write.table(dw2, gzfile('counts_HXO.tsv.gz'), sep="\t", quote=F, row.names=F)
+
+
+CRC1502LMH0000000000R02000 
+CRC1502LMX0A02001TUMR02000
+CRC0076LMH0000000000R02000 
+CRC0076LMX0B02204TUMR08000
+CRC0399LMH0000000000R01000
+CRC0399LMX0B02001TUMR04000
+CRC0051LMH0000000000R02000 
+CRC0051LMX0A02201TUMR01000
+CRC0051LMX0B01001TUMR01000
+
+
+CRC1502LMH0000000000R02000 
+CRC1502LMX0A02001TUMR02000
+CRC0076LMH0000000000R02000 
+CRC0076LMX0B02204TUMR08000
+CRC0399LMH0000000000R01000
+CRC0399LMX0B02001TUMR04000
+CRC0051LMH0000000000R02000 
+CRC0051LMX0A02201TUMR01000
+CRC0051LMX0B01001TUMR01000
+CRC0051LMO0A02006001R01000
+CRC0051LMO0A04009001R01000
+CRC0076LMO0B03013003R01000
+CRC0076LMO0B03016003R01000
+CRC0399LMO0A02006001R01000
+CRC0399LMO0A04010001R01000
+CRC1502LMO0A03010001R01000
+CRC1502LMO0A04010001R01000
